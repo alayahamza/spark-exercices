@@ -7,6 +7,8 @@ import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 import org.halaya.Stream.writeBatch
 
+import java.util.Properties
+
 object Stream {
   def main(args: Array[String]): Unit = {
     val spark: SparkSession = SparkSession.builder()
@@ -37,18 +39,28 @@ object Stream {
       .select("data.*")
 
 
-    //    dataFrame.writeStream.foreachBatch((batchDF: Dataset[Row], batchId: Long) => {
-    //      writeBatch(batchDF)
-    //    })
-    //  }
+      .writeStream.foreachBatch { (batchDF: DataFrame, batchId: Long) =>
+      println("batchId : " + batchId)
+      batchDF.printSchema()
+      batchDF.show(100, truncate = false)
 
-    dataFrame.writeStream
-      .format("json")
-      .option("path", "src/main/resources/stream.json")
-      .option("checkpointLocation", "src/main/resources/tmp")
-      .outputMode(OutputMode.Append())
-      .start()
+      val mode = "append"
+      val url = "jdbc:postgresql://localhost:5432/postgres"
+      val properties: Properties = new Properties()
+      properties.setProperty("user", "postgres_user")
+      properties.setProperty("password", "postgres_password")
+      properties.setProperty("driver", "org.postgresql.Driver")
+      batchDF.write.mode(mode).jdbc(url = url, table = "BACKBLAZE_SMART", properties)
+    }.start()
       .awaitTermination()
+
+    //    dataFrame.writeStream
+    //      .format("json")
+    //      .option("path", "src/main/resources/stream.json")
+    //      .option("checkpointLocation", "src/main/resources/tmp")
+    //      .outputMode(OutputMode.Append())
+    //      .start()
+    //      .awaitTermination()
   }
 
   private def writeBatch = {
